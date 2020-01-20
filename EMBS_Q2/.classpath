@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-10">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/lib/asm-3.1.jar"/>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/lib/java-aux-2.0.jar"/>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/lib/mrdoclet.jar"/>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/lib/mzc.jar"/>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/lib/stubs.jar"/>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/gac/avrraven-system-11.0.jar"/>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/gac/dust-system-11.0.jar"/>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/gac/iris-system-11.0.jar"/>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/gac/logger-11.0.jar"/>
+	<classpathentry kind="lib" path="C:/Moterunner/moterunner/gac/saguaro-system-11.0.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
