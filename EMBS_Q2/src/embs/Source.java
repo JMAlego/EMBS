@@ -14,9 +14,10 @@ public class Source {
      */
 
     /* -- Radio Settings -- */
-    private static /* final */ byte SOURCE_CHANNEL = 0;
-    private static /* final */ byte SOURCE_PAN_ID  = 0x11;
-    private static /* final */ byte SOURC_ADDRESS  = 0x42;
+    private static /* final */ byte SOURCE_CHANNEL          =  0;
+    private static /* final */ byte SOURCE_PAN_ID           =  0x11;
+    private static /* final */ byte SOURCE_ADDRESS          =  0x42;
+    private static /* final */ byte SOURCE_SPECIAL_MESSAGE  =  0x32;
 
     /* -- Timing Constants */
     private static /* final */ int MAX_TIMEOUT = 120; // 2 * 60 Seconds
@@ -25,12 +26,17 @@ public class Source {
     private static /* final */ int LAST_BEACON_VALUE     = 1;
     private static /* final */ int MIN_BEACON_COUNT      = 2;
     private static /* final */ int MAX_BEACON_COUNT      = 10;
-    private static /* final */ int MAX_INTER_BEACON_TIME = 1500;                                                       // Milliseconds
-    private static /* final */ int RECEPTION_LEEWAY      = 1000;                                                       // Milliseconds
-    private static /* final */ int MAX_RECEPTION_PERIOD  = MAX_BEACON_COUNT * MAX_INTER_BEACON_TIME + RECEPTION_LEEWAY;
+    private static /* final */ long MAX_INTER_BEACON_TIME = Time.toTickSpan(Time.MILLISECS, 1500);                                                       // Milliseconds
+    private static /* final */ long MIN_INTER_BEACON_TIME     = Time.toTickSpan(Time.MILLISECS, 250);                                                       // Milliseconds
 
     /* -- Sink Constants -- */
     private static /* final */ int SINK_COUNT = 3;
+    private static /* final */ int SINK_A_INDEX = 0;
+    private static /* final */ int SINK_B_INDEX = 1;
+    private static /* final */ int SINK_C_INDEX = 2;
+    private static /* final */ int SINK_BASE_PAN = 0x11;
+    private static /* final */ int SINK_BASE_ADDRESS = 0x11;
+    private static /* final */ byte SINK_BASE_CHANNEL = 0;
 
     /* Message Constants */
     private static /* final */ int MESSAGE_PAYLOAD_START_INDEX        = 11;
@@ -47,18 +53,28 @@ public class Source {
     /* -- Beacon Data -- */
     private static long beaconTimings[]       = new long[SINK_COUNT * MAX_BEACON_COUNT];
     private static long interBeaconEstimate[] = new long[SINK_COUNT];
+    private static byte previousBeaconN[]     = new byte[SINK_COUNT];
+    private static byte maxBeaconN[]          = new byte[SINK_COUNT];
+    private static long lastBeaconTime[]      = new long[SINK_COUNT];
+    private static boolean estimationDone     = false;
+    
+    private static long nextScheduledTransmitTime[] = new long[SINK_COUNT];
 
     /* -- State Tracking -- */
     private static int currentState            = STATE_START;
-    private static int currentSinkReceiveIndex = 0;          // The beacon we're currently listening to
+    private static int currentSinkReceiveIndex = -1;          // The beacon we're currently listening to
 
-    private static boolean radioLock = false;
+    private static int writeInProgressLock = -1;
 
     /* Transmit Timers */
-    private static Timer timerSinkA     = new Timer();
-    private static Timer timerSinkB     = new Timer();
-    private static Timer timerSinkC     = new Timer();
-    private static Timer estimatorTimer = new Timer();
+    private static Timer timerSinkA             = new Timer();
+    private static Timer timerSinkB             = new Timer();
+    private static Timer timerSinkC             = new Timer();
+    private static Timer estimatorTimer         = new Timer();
+    private static Timer receptionTimeoutTimer  = new Timer();
+    private static Timer transmissionDelayTimer = new Timer();
+    
+    private static byte[] transmitBuffer = new byte[12];
 
     static {
         resetVariables();
@@ -66,15 +82,58 @@ public class Source {
         radio.open(Radio.DID, null, 0, 0);
 
         radio.setRxHandler(new DevCallback(null) {
+        	@Override
             public int invoke(int flags, byte[] data, int len, int info, long time) {
                 return Source.onReceive(flags, data, len, info, time);
+            }
+        });
+        
+        radio.setTxHandler(new DevCallback(null) {
+        	@Override
+            public int invoke(int flags, byte[] data, int len, int info, long time) {
+                return Source.onTransmit(flags, data, len, info, time);
             }
         });
 
         estimatorTimer.setCallback(new TimerEvent(null) {
             @Override
-            public void invoke(byte arg0, long arg1) {
-                estimatorTask(arg0, arg1);
+            public void invoke(byte param, long time) {
+                estimatorTask(param, time);
+            }
+        });
+        
+        timerSinkA.setCallback(new TimerEvent(null) {
+            @Override
+            public void invoke(byte param, long time) {
+                sinkTransmitTaskA(param, time);
+            }
+        });
+        
+        timerSinkB.setCallback(new TimerEvent(null) {
+            @Override
+            public void invoke(byte param, long time) {
+                sinkTransmitTaskB(param, time);
+            }
+        });
+        
+        timerSinkC.setCallback(new TimerEvent(null) {
+            @Override
+            public void invoke(byte param, long time) {
+                sinkTransmitTaskC(param, time);
+            }
+        });
+        
+        receptionTimeoutTimer.setCallback(new TimerEvent(null) {
+            @Override
+            public void invoke(byte param, long time) {
+                receptionTimeoutTask(param, time);
+            }
+        });
+        
+        transmissionDelayTimer.setCallback(new TimerEvent(null) {
+            @Override
+            public void invoke(byte param, long time) {
+                delayedTransmission(param, time);
             }
         });
 
@@ -83,12 +142,22 @@ public class Source {
                 return Source.onDelete(type, info);
             }
         });
+        
+        transmitBuffer[0] = Radio.FCF_BEACON;
+        transmitBuffer[1] = Radio.FCA_SRC_SADDR|Radio.FCA_DST_SADDR;
+        Util.set16le(transmitBuffer, 3, SINK_BASE_PAN);
+        Util.set16le(transmitBuffer, 5, SINK_BASE_ADDRESS);
+        Util.set16le(transmitBuffer, 7, SOURCE_PAN_ID);
+        Util.set16le(transmitBuffer, 9, SOURCE_ADDRESS);
+        transmitBuffer[11] = SOURCE_SPECIAL_MESSAGE;
 
         // Setup radio channel, pan, and address
         setupRadio();
 
         // Start Radio RX
         startRx();
+        
+        currentState = STATE_RECEPTION;
 
         estimatorTimer.setAlarmBySpan(Time.toTickSpan(Time.MILLISECS, 100));
     }
@@ -96,17 +165,88 @@ public class Source {
     private static void resetVariables() {
         for (int sinkIndex = 0; sinkIndex < SINK_COUNT; sinkIndex++) {
             interBeaconEstimate[sinkIndex] = 0;
-
+            maxBeaconN[sinkIndex] = 0;
+            previousBeaconN[sinkIndex] = 0;
+            lastBeaconTime[sinkIndex] = 0;
+            nextScheduledTransmitTime[sinkIndex] = -1;
+            
             for (int beaconIndex = 0; beaconIndex < MAX_BEACON_COUNT; beaconIndex++) {
                 beaconTimings[(sinkIndex * MAX_BEACON_COUNT) + beaconIndex] = -1;
             }
         }
     }
 
-    private static void setupRadio() {
+	protected static void sinkTransmitTaskA(byte param, long time) {
+    	sinkTransmitTask(SINK_A_INDEX, time);
+	}
+    
+    protected static void sinkTransmitTaskB(byte param, long time) {
+    	sinkTransmitTask(SINK_B_INDEX, time);
+	}
+    
+    protected static void sinkTransmitTaskC(byte param, long time) {
+    	sinkTransmitTask(SINK_C_INDEX, time);
+	}
+    
+    private static void scheduleTransmitTask(int sinkIndex, long time) {
+    	long nextEventTick = time + interBeaconEstimate[sinkIndex] * (10 + maxBeaconN[sinkIndex]);
+    	if(previousBeaconN[sinkIndex] == maxBeaconN[sinkIndex]) {    		
+    		nextEventTick += (interBeaconEstimate[sinkIndex] / 2);
+    	}
+    	nextScheduledTransmitTime[sinkIndex] = nextEventTick;
+    	
+    	switch (sinkIndex) {
+		case 0:
+			timerSinkA.setAlarmTime(nextEventTick);
+			break;
+		case 1:
+			timerSinkB.setAlarmTime(nextEventTick);
+			break;
+		case 2:
+			timerSinkC.setAlarmTime(nextEventTick);
+			break;
+
+		default:
+			break;
+		}
+    }
+
+    private static void sinkTransmitTask(int sinkIndex, long time) {
+    	LED.setState((byte)1, (byte)1);
+    	
+    	if(writeInProgressLock == -1 || writeInProgressLock == sinkIndex) {
+    		writeInProgressLock = sinkIndex;
+    		currentState = STATE_TRANSMISSION;
+
+    		changeRadio(sinkIndex);
+    	}else {
+    		if(nextScheduledTransmitTime[sinkIndex] == -1) {
+    			scheduleTransmitTask(sinkIndex, time);
+    		}else {
+    			scheduleTransmitTask(sinkIndex, nextScheduledTransmitTime[sinkIndex]);
+    		}
+    	}
+	}
+
+	protected static int onTransmit(int flags, byte[] data, int len, int info, long time) {
+		LED.setState((byte)2, (byte)0);
+		
+		if(data != null) {
+			writeInProgressLock = -1;
+			currentState = STATE_RECEPTION;
+			
+			if(currentSinkReceiveIndex != -1) {
+				changeRadio(currentSinkReceiveIndex);
+			}
+		}
+		
+		return 0;
+	}
+
+	private static void setupRadio() {
         radio.setPanId(SOURCE_PAN_ID, true);
 
-        radio.setShortAddr(SOURC_ADDRESS);
+        radio.setShortAddr(SOURCE_ADDRESS);
 
         radio.setChannel(SOURCE_CHANNEL);
     }
@@ -121,19 +261,24 @@ public class Source {
         }
 
         if (sinkToEstimateIndex != -1) {
+        	currentSinkReceiveIndex = sinkToEstimateIndex;
             changeRadio(sinkToEstimateIndex);
             startRx();
+        }else {
+        	estimationDone = true;
         }
     }
 
     private static void changeRadio(int sinkIndex) {
-        radio.stopRx();
-
-        radio.setPanId(0x11 + sinkIndex, true);
-
-        radio.setShortAddr(SOURC_ADDRESS);
-
-        radio.setChannel((byte) sinkIndex);
+    	if(writeInProgressLock == sinkIndex || writeInProgressLock == -1) {
+	        radio.stopRx();
+	
+	        radio.setPanId(SINK_BASE_PAN + sinkIndex, true);
+	
+	        radio.setShortAddr(SOURCE_ADDRESS);
+	
+	        radio.setChannel((byte) (SINK_BASE_CHANNEL + (byte) sinkIndex));
+    	}
     }
 
     private static void startRx() {
@@ -171,9 +316,9 @@ public class Source {
             }
         }
 
-        // If we found no differences, then assume minimum
+        // If we found no differences, return error value
         if (count == 0) {
-            return Time.toTickSpan(Time.MILLISECS, 250);
+            return -1;
         }
 
         // Calculate average of all differences
@@ -209,11 +354,16 @@ public class Source {
          * |11|Payload            |
          * +--+-------------------+
          */
-
+        
         byte beaconValue = data[MESSAGE_PAYLOAD_START_INDEX];
         int beaconAddress = Util.get16le(data, MESSAGE_SOURCE_ADDRESS_START_INDEX);
+        
+        if(beaconAddress == 0x42) {
+        	return 0;
+        }
+        
         int sinkIndex = sinkAddressToIndex(beaconAddress);
-
+        
         if (sinkIndex == -1) {
             Logger.appendString(csr.s2b("INVALID BEACON VALUE!"));
             Logger.flush(Mote.ERROR);
@@ -221,29 +371,103 @@ public class Source {
             return 0;
         }
 
+        if(maxBeaconN[sinkIndex] < beaconValue)
+        {
+        	previousBeaconN[sinkIndex] = maxBeaconN[sinkIndex];
+        	maxBeaconN[sinkIndex] = beaconValue;
+        }
+        
+        lastBeaconTime[sinkIndex] = time;
+
+        if(writeInProgressLock != -1 && sinkIndex != writeInProgressLock) {
+        	return 0;
+        }
+        
+        if(currentState == STATE_RECEPTION && estimationDone == false) {
+        	handleEstimationReception(beaconValue, sinkIndex, time);
+        } else if(currentState == STATE_TRANSMISSION) {
+        	handleTransmitSync(beaconValue, sinkIndex, time);
+        }
+
+        return 0;
+    }
+    
+    private static void handleEstimationReception(byte beaconValue, int sinkIndex, long time) {
         recordBeacon(beaconValue, sinkIndex, time);
 
         Logger.appendString(csr.s2b("Received "));
         Logger.appendByte(beaconValue);
 
-        if (beaconValue == LAST_BEACON_VALUE) {
-            long estimateOfT = estimateT(sinkIndex);
-
-            Logger.appendString(csr.s2b(" ! "));
-            Logger.appendInt(sinkIndex);
-            Logger.appendString(csr.s2b(" ! "));
-            Logger.appendLong(Time.fromTickSpan(Time.MILLISECS, estimateOfT));
-            Logger.appendString(csr.s2b(" LAST."));
-
-            interBeaconEstimate[sinkIndex] = estimateOfT;
-
-            estimatorTimer.setAlarmBySpan(estimateOfT + Time.toTickSpan(Time.MILLISECS, 250));
-        }
+        long estimateOfT = estimateT(sinkIndex);
+        Logger.appendString(csr.s2b(" ! "));
+        Logger.appendInt(sinkIndex);
+        Logger.appendString(csr.s2b(" ! "));
+        Logger.appendLong(Time.fromTickSpan(Time.MILLISECS, estimateOfT));
 
         Logger.flush(Mote.WARN);
 
-        return 0;
+        if (beaconValue == LAST_BEACON_VALUE) {
+        	if(estimateOfT != -1) {        		
+        		interBeaconEstimate[sinkIndex] = estimateOfT;
+        		
+        		receptionTimeoutTimer.cancelAlarm();
+        		
+        		currentSinkReceiveIndex = -1;
+        		
+        		writeInProgressLock = sinkIndex;
+        		handleTransmitSync(beaconValue, sinkIndex, time);
+        		
+        		estimatorTimer.setAlarmBySpan(2 * estimateOfT);
+        	}
+        	// Do nothing
+        }else {
+        	if(estimateOfT == -1) {   
+        		estimateOfT = MAX_INTER_BEACON_TIME;
+        	}
+        	receptionTimeoutTimer.cancelAlarm();
+        	receptionTimeoutTimer.setAlarmBySpan(2 * estimateOfT);
+        }
+
     }
+    
+    protected static void receptionTimeoutTask(byte param, long time) {
+    	if(currentSinkReceiveIndex != -1) {
+	    	Logger.appendString(csr.s2b("Reception ended due to timeout."));
+	    	Logger.flush(Mote.WARN);
+	    	
+	    	long estimateOfT = estimateT(currentSinkReceiveIndex);
+	    	
+	    	interBeaconEstimate[currentSinkReceiveIndex] = estimateOfT;
+	    	
+	    	scheduleTransmitTask(currentSinkReceiveIndex, lastBeaconTime[currentSinkReceiveIndex]);
+	    	
+	    	currentSinkReceiveIndex = -1;
+	    	estimatorTimer.setAlarmBySpan(estimateOfT + MIN_INTER_BEACON_TIME);
+    	}
+	}
+    
+    private static void handleTransmitSync(byte beaconValue, int sinkIndex, long time) {
+    	LED.setState((byte)1, (byte)1);
+    	
+    	if(beaconValue == 1) {
+    		Util.set16le(transmitBuffer, 3, SINK_BASE_PAN + sinkIndex);
+    		Util.set16le(transmitBuffer, 5, SINK_BASE_ADDRESS + sinkIndex);
+    		Util.set16le(transmitBuffer, 7, SINK_BASE_PAN + sinkIndex);
+    		
+    		long delay = interBeaconEstimate[sinkIndex] + (MIN_INTER_BEACON_TIME / 2);
+    		transmissionDelayTimer.setAlarmTime(time + delay);
+    		LED.setState((byte)2, (byte)1);
+    		LED.setState((byte)1, (byte)0);
+    	}
+    	
+    	scheduleTransmitTask(sinkIndex, time);
+    }
+    
+	protected static void delayedTransmission(byte param, long time) {
+		radio.transmit(Device.ASAP|Radio.TXMODE_POWER_MAX, transmitBuffer, 0, transmitBuffer.length, 0);
+		Logger.appendString(csr.s2b("+TX+"));
+		Logger.flush(Mote.WARN);
+	}
 
     private static int sinkAddressToIndex(int address) {
         if (address > 0x13 || address < 0x11) {
