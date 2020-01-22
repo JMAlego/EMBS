@@ -16,15 +16,5 @@
 	<classpathentry kind="lib" path="C:/Moterunner/moterunner/gac/iris-system-11.0.jar"/>
 	<classpathentry kind="lib" path="C:/Moterunner/moterunner/gac/logger-11.0.jar"/>
 	<classpathentry kind="lib" path="C:/Moterunner/moterunner/gac/saguaro-system-11.0.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/gac/avrraven-system-11.0.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/gac/dust-system-11.0.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/gac/iris-system-11.0.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/gac/logger-11.0.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/gac/saguaro-system-11.0.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/lib/asm-3.1.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/lib/java-aux-2.0.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/lib/mrdoclet.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/lib/mzc.jar"/>
-	<classpathentry kind="lib" path="C:/Apps/moterunner/lib/stubs.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
