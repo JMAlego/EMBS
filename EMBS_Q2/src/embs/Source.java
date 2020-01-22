@@ -3,6 +3,10 @@ package embs;
 import com.ibm.saguaro.logger.Logger;
 import com.ibm.saguaro.system.*;
 
+/**
+ * Source assembly responsible for synchronising and transmitting to Sinks
+ * using the EMBS MAC protocol.
+ */
 public class Source {
     static Radio radio = new Radio();
 
@@ -24,17 +28,27 @@ public class Source {
      * |10|Source Address     |
      * |11|Payload            |
      * +--+-------------------+
+     * 
+     * 16 bit values in the beacon are encoded in little-endian.
+     * 
+     * - Transmit Notes -
+     * 
+     * Our short address is 0x42.
+     * 
+     * The payload is 0x32 as a nice power of two, though this could be any value.
+     * 
      */
 
     /*-*-*- Constant Values -*-*-*/
 
     /*
-     * Constant values are marked with "final" in a comment as Moterunner does
+     * Constant values are marked with "final" in a comment as Mote Runner does
      * not support final variables.
      */
 
+    private static /* final */ boolean ENABLE_DEBUG_PRINTING = true;
+
     /* -- Radio Settings -- */
-    private static /* final */ byte SOURCE_CHANNEL         = 0;
     private static /* final */ byte SOURCE_PAN_ID          = 0x11;
     private static /* final */ byte SOURCE_ADDRESS         = 0x42;
     private static /* final */ byte SOURCE_SPECIAL_MESSAGE = 0x32;
@@ -44,10 +58,9 @@ public class Source {
 
     /* -- Beacon Constants -- */
     private static /* final */ int  LAST_BEACON_VALUE     = 1;
-    private static /* final */ int  MIN_BEACON_COUNT      = 2;
     private static /* final */ int  MAX_BEACON_COUNT      = 10;
-    private static /* final */ long MAX_INTER_BEACON_TIME = Time.toTickSpan(Time.MILLISECS, 1500); // Max "t"
-    private static /* final */ long MIN_INTER_BEACON_TIME = Time.toTickSpan(Time.MILLISECS, 250);  // Min "t"
+    private static /* final */ long MAX_INTER_BEACON_TIME = Time.toTickSpan(Time.MILLISECS, 1500); // Maximum "t"
+    private static /* final */ long MIN_INTER_BEACON_TIME = Time.toTickSpan(Time.MILLISECS, 250);  // Minimum "t"
 
     /* -- Sink Constants -- */
     private static /* final */ int  SINK_COUNT        = 3;
@@ -65,9 +78,9 @@ public class Source {
     /* -- Write Constants -- */
 
     private static /* final */ int WRITE_UNLOCKED = -1;
-    
+
     /* -- Generic Constants -- */
-    
+
     private static /* final */ int NO_VALUE = -1;
 
     /* -- LED Constants -- */
@@ -118,11 +131,18 @@ public class Source {
     private static int writeInProgressLock = WRITE_UNLOCKED;
 
     /* Transmit Timers */
-    private static Timer timerSinkA             = new Timer();
-    private static Timer timerSinkB             = new Timer();
-    private static Timer timerSinkC             = new Timer();
-    private static Timer estimatorTimer         = new Timer();
-    private static Timer receptionTimeoutTimer  = new Timer();
+    // Timers for sink transmission
+    private static Timer timerSinkA = new Timer();
+    private static Timer timerSinkB = new Timer();
+    private static Timer timerSinkC = new Timer();
+
+    // Delay for the start of the estimation code
+    private static Timer estimatorTimer = new Timer();
+
+    // Timeout on reception, detects when reception was interrupted by transmission
+    private static Timer receptionTimeoutTimer = new Timer();
+
+    // Delays the transmission until inside the transmission slot
     private static Timer transmissionDelayTimer = new Timer();
 
     // The transmission buffer
@@ -151,6 +171,7 @@ public class Source {
             }
         });
 
+        // Map the estimator timer to the estimator task
         estimatorTimer.setCallback(new TimerEvent(null) {
             @Override
             public void invoke(byte param, long time) {
@@ -158,6 +179,7 @@ public class Source {
             }
         });
 
+        // Map the Sink A transmit task to the Sink A transmit timer
         timerSinkA.setCallback(new TimerEvent(null) {
             @Override
             public void invoke(byte param, long time) {
@@ -165,6 +187,7 @@ public class Source {
             }
         });
 
+        // Map the Sink B transmit task to the Sink B transmit timer
         timerSinkB.setCallback(new TimerEvent(null) {
             @Override
             public void invoke(byte param, long time) {
@@ -172,6 +195,7 @@ public class Source {
             }
         });
 
+        // Map the Sink C transmit task to the Sink C transmit timer
         timerSinkC.setCallback(new TimerEvent(null) {
             @Override
             public void invoke(byte param, long time) {
@@ -179,6 +203,7 @@ public class Source {
             }
         });
 
+        // Map reception timeout to reception timeout task
         receptionTimeoutTimer.setCallback(new TimerEvent(null) {
             @Override
             public void invoke(byte param, long time) {
@@ -186,6 +211,7 @@ public class Source {
             }
         });
 
+        // Map transmission delay timer to delayed transmission handler
         transmissionDelayTimer.setCallback(new TimerEvent(null) {
             @Override
             public void invoke(byte param, long time) {
@@ -193,12 +219,14 @@ public class Source {
             }
         });
 
+        // Setup callback to free radio use after assembly delete
         Assembly.setSystemInfoCallback(new SystemInfo(null) {
             public int invoke(int type, int info) {
                 return Source.onDelete(type, info);
             }
         });
 
+        // Setup template for message transmissions.
         transmitBuffer[0] = Radio.FCF_BEACON;
         transmitBuffer[1] = Radio.FCA_SRC_SADDR | Radio.FCA_DST_SADDR;
         Util.set16le(transmitBuffer, 3, SINK_BASE_PAN);
@@ -207,44 +235,76 @@ public class Source {
         Util.set16le(transmitBuffer, 9, SOURCE_ADDRESS);
         transmitBuffer[11] = SOURCE_SPECIAL_MESSAGE;
 
+        // Set transmission state to false.
         transmitting = false;
 
+        // Trigger first run of estimator.
         estimatorTimer.setAlarmBySpan(Time.toTickSpan(Time.MILLISECS, 100));
     }
 
+    /**
+     * Reset globals to initial values at startup.
+     */
     private static void resetVariables() {
+        // For each sink...
         for (int sinkIndex = 0; sinkIndex < SINK_COUNT; sinkIndex++) {
+            // Clear the following globals:
             interBeaconEstimate[sinkIndex] = 0;
             maxBeaconN[sinkIndex] = 0;
             previousBeaconN[sinkIndex] = 0;
             lastBeaconTime[sinkIndex] = 0;
             nextScheduledTransmitTime[sinkIndex] = NO_VALUE;
 
+            // For each beacon slot...
             for (int beaconIndex = 0; beaconIndex < MAX_BEACON_COUNT; beaconIndex++) {
+                // Set it to the "no value" value.
                 beaconTimings[(sinkIndex * MAX_BEACON_COUNT) + beaconIndex] = NO_VALUE;
             }
         }
     }
 
+    /**
+     * Proxies to {@link #scheduleTransmitTask(int, long)}.
+     */
     protected static void sinkTransmitTaskA(byte param, long time) {
         sinkTransmitTask(SINK_A_INDEX, time);
     }
 
+    /**
+     * Proxies to {@link #scheduleTransmitTask(int, long)}.
+     */
     protected static void sinkTransmitTaskB(byte param, long time) {
         sinkTransmitTask(SINK_B_INDEX, time);
     }
 
+    /**
+     * Proxies to {@link #scheduleTransmitTask(int, long)}.
+     */
     protected static void sinkTransmitTaskC(byte param, long time) {
         sinkTransmitTask(SINK_C_INDEX, time);
     }
 
+    /**
+     * Schedule a transmit task.
+     */
     private static void scheduleTransmitTask(int sinkIndex, long time) {
+        // The next arrival is the time of the last arrival (now) plus the
+        // length "t" times 10 (the sleep phase) plus the number of messages in
+        // a sync phase ("n").
+        // Note: this lags slightly behind to ensure synchronisation can occur.
         long nextEventTick = time + interBeaconEstimate[sinkIndex] * (10 + maxBeaconN[sinkIndex]);
+
+        // If we are sure of the value of "n" we can push our estimate by half
+        // of "t" and still synchronise successfully.
         if (previousBeaconN[sinkIndex] == maxBeaconN[sinkIndex]) {
             nextEventTick += (interBeaconEstimate[sinkIndex] / 2);
         }
+
+        // Log the time at which this event should occur, this may not be the
+        // time at which it does, as the system may be busy.
         nextScheduledTransmitTime[sinkIndex] = nextEventTick;
 
+        // Set alarm based on index.
         switch (sinkIndex) {
         case 0:
             timerSinkA.setAlarmTime(nextEventTick);
@@ -261,30 +321,44 @@ public class Source {
         }
     }
 
+    /**
+     * Handles all transmit tasks for all sinks, A, B, and C.
+     */
     private static void sinkTransmitTask(int sinkIndex, long time) {
-        LED.setState(LED_GREEN, LED_ON);
-
+        // If write is unlocked or it is already locked to the right sink
         if (writeInProgressLock == WRITE_UNLOCKED || writeInProgressLock == sinkIndex) {
+            LED.setState(LED_GREEN, LED_ON);
+
             writeInProgressLock = sinkIndex;
             transmitting = true;
 
             changeRadio(sinkIndex);
         } else {
+            // If this is the first time a transmit task is being scheduled for this sink
             if (nextScheduledTransmitTime[sinkIndex] == NO_VALUE) {
                 scheduleTransmitTask(sinkIndex, time);
             } else {
+                // We schedule here based on when this task was meant to run,
+                // this may be in the past as we may have been busy at that time
                 scheduleTransmitTask(sinkIndex, nextScheduledTransmitTime[sinkIndex]);
             }
         }
     }
 
+    /**
+     * Handles cleanup after transmission of a message.
+     */
     protected static int onTransmit(int flags, byte[] data, int len, int info, long time) {
-        LED.setState(LED_RED, LED_OFF);
-
+        // If we actually sent a packet
         if (data != null) {
+            // Indicate transmission
+            LED.setState(LED_RED, LED_OFF);
+
+            // Unlock transmission and mark as not transmitting
             writeInProgressLock = WRITE_UNLOCKED;
             transmitting = false;
 
+            // Change the radio back to the receive setting, if it had one
             if (currentSinkReceiveIndex != NO_VALUE) {
                 changeRadio(currentSinkReceiveIndex);
             }
@@ -293,27 +367,45 @@ public class Source {
         return 0;
     }
 
-    protected static void estimatorTask(byte arg0, long arg1) {
+    /**
+     * This task is responsible for choosing which sink to estimate "n" and "t" for
+     * next.
+     */
+    protected static void estimatorTask(byte param, long time) {
+        if (estimationDone)
+            return;
+
+        // Find an sink not yet estimated
         int sinkToEstimateIndex = NO_VALUE;
         for (int sinkIndex = 0; sinkIndex < SINK_COUNT; sinkIndex++) {
-            if (interBeaconEstimate[sinkIndex] == 0) {
+            // If a sink isn't estimated it's estimate will be zero, no actual
+            // sink will have this estimate as the minimum "t" is 250 milliseconds
+            if (interBeaconEstimate[sinkIndex] < 1) {
                 sinkToEstimateIndex = sinkIndex;
                 break;
             }
         }
 
+        // If we found a sink to estimate
         if (sinkToEstimateIndex != NO_VALUE) {
+            // Note the sink and start listening
             currentSinkReceiveIndex = sinkToEstimateIndex;
 
             changeRadio(sinkToEstimateIndex);
 
             startRx();
         } else {
+            // Setting this mean no more estimation will take place.
             estimationDone = true;
         }
     }
 
+    /**
+     * Change the radio to the settings for a particular sink.
+     */
     private static void changeRadio(int sinkIndex) {
+        // We can only change settings if the write lock is unlocked, or says
+        // we should be targeting the sink we were passed in
         if (writeInProgressLock == sinkIndex || writeInProgressLock == WRITE_UNLOCKED) {
             radio.stopRx();
 
@@ -325,10 +417,17 @@ public class Source {
         }
     }
 
+    /**
+     * Starts the radio receiving.
+     */
     private static void startRx() {
         radio.startRx(Device.ASAP, 0, Time.currentTicks() + MAX_TIMEOUT);
     }
 
+    /**
+     * Responsible for estimating the true value of "t". Averages the beacon
+     * interval, while taking missed beacons into account.
+     */
     private static long estimateT(int sinkIndex) {
         long skipped = 0; // "Skipped" or "missed" beacons e.g. if we receive 3,4,6.. then 5 was "skipped"
         long lastValue = NO_VALUE;
@@ -360,7 +459,7 @@ public class Source {
             }
         }
 
-        // If we found no differences, return error value
+        // If we found no differences, return the "no value" indicator
         if (count == 0) {
             return NO_VALUE;
         }
@@ -369,100 +468,166 @@ public class Source {
         return differenceSum / count;
     }
 
+    /**
+     * Record the receive time of a beacon.
+     */
     private static void recordBeacon(int beaconIndex, int sinkIndex, long time) {
         beaconTimings[(sinkIndex * MAX_BEACON_COUNT) + beaconIndex - 1] = time;
     }
 
+    /**
+     * Handle beacon reception.
+     */
     protected static int onReceive(int flags, byte[] data, int len, int info, long time) {
+        // If receiving has timed out, restart it.
         if (data == null) {
             startRx();
 
             return 0;
         }
 
+        // Ignore messages which are too short.
+        if (data.length <= MESSAGE_PAYLOAD_START_INDEX) {
+            if (ENABLE_DEBUG_PRINTING) {
+                Logger.appendString(csr.s2b("MESSAGE TOO SHORT!"));
+                Logger.flush(Mote.ERROR);
+            }
+
+            return 0;
+        }
+
+        // Read the value and source address of the beacon.
         byte beaconValue = data[MESSAGE_PAYLOAD_START_INDEX];
         int beaconAddress = Util.get16le(data, MESSAGE_SOURCE_ADDRESS_START_INDEX);
 
+        // If source address is this assembly, ignore it.
         if (beaconAddress == 0x42) {
             return 0;
         }
 
+        // Get the sink "index" based on it's address.
         int sinkIndex = sinkAddressToIndex(beaconAddress);
 
+        // Throw an error if we got an illegal value.
         if (sinkIndex == NO_VALUE) {
-            Logger.appendString(csr.s2b("INVALID BEACON VALUE!"));
-            Logger.flush(Mote.ERROR);
+            if (ENABLE_DEBUG_PRINTING) {
+                Logger.appendString(csr.s2b("INVALID BEACON VALUE!"));
+                Logger.flush(Mote.ERROR);
+            }
 
             return 0;
         }
 
+        // If this is the highest "n" for a beacon, note it.
         if (maxBeaconN[sinkIndex] < beaconValue) {
             previousBeaconN[sinkIndex] = maxBeaconN[sinkIndex];
             maxBeaconN[sinkIndex] = beaconValue;
         }
 
+        // Note the last time a beacon was received from this sink.
         lastBeaconTime[sinkIndex] = time;
 
+        // If write is locked to a different channel, exit
         if (writeInProgressLock != WRITE_UNLOCKED && sinkIndex != writeInProgressLock) {
             return 0;
         }
 
+        // If we're not transmitting and we're not done with estimation.
         if (!transmitting && !estimationDone) {
             handleEstimationReception(beaconValue, sinkIndex, time);
-        } else if (transmitting) {
+        } else if (transmitting) { // If we are transmitting
             handleTransmitSync(beaconValue, sinkIndex, time);
         }
 
         return 0;
     }
 
+    /**
+     * Handle messages which are received and need to be used for estimation of "t".
+     */
     private static void handleEstimationReception(byte beaconValue, int sinkIndex, long time) {
+        // Record the beacon.
         recordBeacon(beaconValue, sinkIndex, time);
 
-        Logger.appendString(csr.s2b("Received "));
-        Logger.appendByte(beaconValue);
+        if (ENABLE_DEBUG_PRINTING) {
+            Logger.appendString(csr.s2b("Received "));
+            Logger.appendByte(beaconValue);
+        }
 
+        // Estimate "t" so far
         long estimateOfT = estimateT(sinkIndex);
-        Logger.appendString(csr.s2b(" ! "));
-        Logger.appendInt(sinkIndex);
-        Logger.appendString(csr.s2b(" ! "));
-        Logger.appendLong(Time.fromTickSpan(Time.MILLISECS, estimateOfT));
 
-        Logger.flush(Mote.WARN);
+        if (ENABLE_DEBUG_PRINTING) {
+            Logger.appendString(csr.s2b(" from "));
+            Logger.appendInt(sinkIndex);
+            Logger.appendString(csr.s2b(", estimate is "));
+            Logger.appendLong(Time.fromTickSpan(Time.MILLISECS, estimateOfT));
 
+            Logger.flush(Mote.WARN);
+        }
+
+        // If this is the last beacon in a sync phase
         if (beaconValue == LAST_BEACON_VALUE) {
+            // If we have an estimate for "t"
             if (estimateOfT != NO_VALUE) {
+                // Log our estimate of "t"
                 interBeaconEstimate[sinkIndex] = estimateOfT;
 
+                // Cancel the timeout
                 receptionTimeoutTimer.cancelAlarm();
 
+                // Clear the current sink
                 currentSinkReceiveIndex = NO_VALUE;
 
+                // Lock for writing
                 writeInProgressLock = sinkIndex;
+
+                // Prepare for transmit
                 handleTransmitSync(beaconValue, sinkIndex, time);
 
+                // Set estimator to start again after transmission
                 estimatorTimer.setAlarmBySpan(2 * estimateOfT);
             }
-            // Do nothing
-        } else {
+            // Else, do nothing
+        } else { // Else, it wasn't the last beacon in a sync phase
+            // If we don't have an estimate for "t".
             if (estimateOfT == NO_VALUE) {
+                // Guess it's the max "t" for the timeout
                 estimateOfT = MAX_INTER_BEACON_TIME;
             }
+
+            // Set timeout to twice our current estimate for "t".
             receptionTimeoutTimer.cancelAlarm();
             receptionTimeoutTimer.setAlarmBySpan(2 * estimateOfT);
         }
 
     }
 
+    /**
+     * Handle timeout of estimation reception, usually caused by a conflicting
+     * transmission.
+     */
     protected static void receptionTimeoutTask(byte param, long time) {
+        // If we are (or were) in a reception phase
         if (currentSinkReceiveIndex != NO_VALUE) {
-            Logger.appendString(csr.s2b("Reception ended due to timeout."));
-            Logger.flush(Mote.WARN);
+            // Log the timeout
+            if (ENABLE_DEBUG_PRINTING) {
+                Logger.appendString(csr.s2b("Reception ended due to timeout."));
+                Logger.flush(Mote.WARN);
+            }
 
+            // Get our current estimate of "t"
             long estimateOfT = estimateT(currentSinkReceiveIndex);
 
+            // Set the estimate for this sink to our current estimate.
+            // If the estimate is NO_VALUE (-1) or zero then the estimator task
+            // will pick this beacon to estimate again, so we don't need to
+            // worry about those values.
             interBeaconEstimate[currentSinkReceiveIndex] = estimateOfT;
 
+            // Schedule the next transmission, based on the last reception time.
+            // This is slightly less accurate, but the accuracy will increase
+            // with each transmission cycle.
             scheduleTransmitTask(currentSinkReceiveIndex, lastBeaconTime[currentSinkReceiveIndex]);
 
             currentSinkReceiveIndex = NO_VALUE;
@@ -470,42 +635,70 @@ public class Source {
         }
     }
 
+    /**
+     * Handle synchronisation for transmission.
+     */
     private static void handleTransmitSync(byte beaconValue, int sinkIndex, long time) {
+        // Indicate that the sync phase has started.
         LED.setState(LED_GREEN, LED_ON);
 
-        if (beaconValue == 1) {
+        // If this is the last beacon
+        if (beaconValue == LAST_BEACON_VALUE) {
+            // Set transmission destination.
             Util.set16le(transmitBuffer, 3, SINK_BASE_PAN + sinkIndex);
             Util.set16le(transmitBuffer, 5, SINK_BASE_ADDRESS + sinkIndex);
             Util.set16le(transmitBuffer, 7, SINK_BASE_PAN + sinkIndex);
 
+            // Calculate a small delay to put us inside the transmission
+            // window. This is the rest of the final beacon + half the minimum
+            // value of "t" (250 / 2).
             long delay = interBeaconEstimate[sinkIndex] + (MIN_INTER_BEACON_TIME / 2);
             transmissionDelayTimer.setAlarmTime(time + delay);
 
+            // Indicate that sync is over and we are about to actually transmit.
             LED.setState(LED_RED, LED_ON);
             LED.setState(LED_GREEN, LED_OFF);
         }
 
+        // Schedule the next send.
         scheduleTransmitTask(sinkIndex, time);
     }
 
+    /**
+     * Perform the actual transmission of a message to a sink.
+     */
     protected static void delayedTransmission(byte param, long time) {
+        // Transmit message to sink.
         radio.transmit(Device.ASAP | Radio.TXMODE_POWER_MAX, transmitBuffer, 0, transmitBuffer.length, 0);
-        Logger.appendString(csr.s2b("+TX+"));
-        Logger.flush(Mote.WARN);
+
+        // Log transmission.
+        if (ENABLE_DEBUG_PRINTING) {
+            Logger.appendString(csr.s2b("((TX))"));
+            Logger.flush(Mote.WARN);
+        }
     }
 
+    /**
+     * Helper to convert from short address to internal sink index.
+     */
     private static int sinkAddressToIndex(int address) {
-        if (address > 0x13 || address < 0x11) {
+        // If the address is greater than Sink C's address or less than Sink A's.
+        if (address >= SINK_BASE_ADDRESS + SINK_COUNT || address < SINK_BASE_ADDRESS) {
+            // Return the accepted "no value" value.
             return NO_VALUE;
         }
-        return address - 0x11;
+
+        // Else, the conversion is as simple as the address minus the base address.
+        return address - SINK_BASE_ADDRESS;
     }
 
     /**
      * Clean up after delete.
      */
     protected static int onDelete(int type, int info) {
+        // If the event was actually a delete event.
         if (type == Assembly.SYSEV_DELETED) {
+            // Stop and close the radio.
             radio.stopRx();
             radio.close();
         }
