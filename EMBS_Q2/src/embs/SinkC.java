@@ -15,7 +15,7 @@ public class SinkC {
     private static int n = 5; // number of beacons of sync phase - sample only, assessment will use unknown values
     private static int nc;
 
-    private static int t = 250; // milliseconds between beacons - sample only, assessment will use unknown values
+    private static int t = 1500; // milliseconds between beacons - sample only, assessment will use unknown values
 
     // settings for sink A
     private static byte channel = 2; // channel 13

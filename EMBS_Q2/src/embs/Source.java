@@ -46,47 +46,72 @@ public class Source {
      * not support final variables.
      */
 
-    private static /* final */ boolean ENABLE_DEBUG_PRINTING = true;
+    private static /* final */ boolean ENABLE_DEBUG_PRINTING = false;
+    private static /* final */ boolean ENABLE_TX_PRINTING    = true;
 
-    /* -- Radio Settings -- */
+    /* -- Source Settings -- */
+
+    // Source radio settings.
     private static /* final */ byte SOURCE_PAN_ID          = 0x11;
     private static /* final */ byte SOURCE_ADDRESS         = 0x42;
     private static /* final */ byte SOURCE_SPECIAL_MESSAGE = 0x32;
 
     /* -- Timing Constants */
-    private static /* final */ long MAX_TIMEOUT = Time.toTickSpan(Time.SECONDS, 60); // 2 * 60 Seconds
+
+    // The maximum time that anything should take, e.g. longer than the demo.
+    private static /* final */ long MAX_TIMEOUT = Time.toTickSpan(Time.SECONDS, 60);
 
     /* -- Beacon Constants -- */
-    private static /* final */ int  LAST_BEACON_VALUE     = 1;
-    private static /* final */ int  MAX_BEACON_COUNT      = 10;
-    private static /* final */ long MAX_INTER_BEACON_TIME = Time.toTickSpan(Time.MILLISECS, 1500); // Maximum "t"
-    private static /* final */ long MIN_INTER_BEACON_TIME = Time.toTickSpan(Time.MILLISECS, 250);  // Minimum "t"
+
+    // The received beacon value of the last sync frame.
+    private static /* final */ int LAST_BEACON_VALUE = 1;
+
+    // The maximum number of beacons in a sync phase e.g. max "n".
+    private static /* final */ int MAX_BEACON_COUNT = 10;
+
+    // The maximum and minimum inter-beacon time e.g. "t".
+    private static /* final */ long MAX_INTER_BEACON_TIME = Time.toTickSpan(Time.MILLISECS, 1500);
+    private static /* final */ long MIN_INTER_BEACON_TIME = Time.toTickSpan(Time.MILLISECS, 250);
 
     /* -- Sink Constants -- */
-    private static /* final */ int  SINK_COUNT        = 3;
-    private static /* final */ int  SINK_A_INDEX      = 0;
-    private static /* final */ int  SINK_B_INDEX      = 1;
-    private static /* final */ int  SINK_C_INDEX      = 2;
+
+    // The number of sinks.
+    private static /* final */ int SINK_COUNT = 3;
+
+    // The internal indicies of the sinks.
+    private static /* final */ int SINK_A_INDEX = 0;
+    private static /* final */ int SINK_B_INDEX = 1;
+    private static /* final */ int SINK_C_INDEX = 2;
+
+    // The base PAN, addres, and channel of the sinks.
+    // This assumes that sinks are consecutive, as per the brief.
     private static /* final */ int  SINK_BASE_PAN     = 0x11;
     private static /* final */ int  SINK_BASE_ADDRESS = 0x11;
     private static /* final */ byte SINK_BASE_CHANNEL = 0;
 
     /* -- Message Constants -- */
+
+    // Index of the message payload and the source address into received messages.
     private static /* final */ int MESSAGE_PAYLOAD_START_INDEX        = 11;
     private static /* final */ int MESSAGE_SOURCE_ADDRESS_START_INDEX = 9;
 
     /* -- Write Constants -- */
 
+    // Represents that there is no write lock in place.
     private static /* final */ int WRITE_UNLOCKED = -1;
 
     /* -- Generic Constants -- */
 
+    // A value to represent a "no value" for integer variables.
     private static /* final */ int NO_VALUE = -1;
 
     /* -- LED Constants -- */
 
-    private static /* final */ byte LED_ON    = 1;
-    private static /* final */ byte LED_OFF   = 0;
+    // LED states
+    private static /* final */ byte LED_ON  = 1;
+    private static /* final */ byte LED_OFF = 0;
+
+    // LED colour indices.
     private static /* final */ byte LED_RED   = 2;
     private static /* final */ byte LED_GREEN = 1;
 
@@ -110,10 +135,10 @@ public class Source {
     // The time the last beacon for a sink was received
     private static long[] lastBeaconTime = new long[SINK_COUNT];
 
+    /* -- State Tracking -- */
+
     // The time that the next scheduled transmission is due
     private static long[] nextScheduledTransmitTime = new long[SINK_COUNT];
-
-    /* -- State Tracking -- */
 
     // Indicates if estimation should stop, this is so we don't waste time
     // listening when we don't need to
@@ -227,7 +252,7 @@ public class Source {
         });
 
         // Setup template for message transmissions.
-        transmitBuffer[0] = Radio.FCF_BEACON;
+        transmitBuffer[0] = Radio.FCF_DATA;
         transmitBuffer[1] = Radio.FCA_SRC_SADDR | Radio.FCA_DST_SADDR;
         Util.set16le(transmitBuffer, 3, SINK_BASE_PAN);
         Util.set16le(transmitBuffer, 5, SINK_BASE_ADDRESS);
@@ -237,6 +262,12 @@ public class Source {
 
         // Set transmission state to false.
         transmitting = false;
+
+        // Start radio, this must be done now and then left for a short period
+        // of time (the following timer does this) so that the radio can start
+        // up properly.
+        setRadioProperties(SINK_A_INDEX);
+        startRx();
 
         // Trigger first run of estimator.
         estimatorTimer.setAlarmBySpan(Time.toTickSpan(Time.MILLISECS, 100));
@@ -372,6 +403,11 @@ public class Source {
      * next.
      */
     protected static void estimatorTask(byte param, long time) {
+        if (ENABLE_DEBUG_PRINTING) {
+            Logger.appendString(csr.s2b("Running estimation task."));
+            Logger.flush(Mote.WARN);
+        }
+
         if (estimationDone)
             return;
 
@@ -380,7 +416,7 @@ public class Source {
         for (int sinkIndex = 0; sinkIndex < SINK_COUNT; sinkIndex++) {
             // If a sink isn't estimated it's estimate will be zero, no actual
             // sink will have this estimate as the minimum "t" is 250 milliseconds
-            if (interBeaconEstimate[sinkIndex] < 1) {
+            if (interBeaconEstimate[sinkIndex] == 0 || interBeaconEstimate[sinkIndex] == NO_VALUE) {
                 sinkToEstimateIndex = sinkIndex;
                 break;
             }
@@ -388,6 +424,11 @@ public class Source {
 
         // If we found a sink to estimate
         if (sinkToEstimateIndex != NO_VALUE) {
+            if (ENABLE_DEBUG_PRINTING) {
+                Logger.appendString(csr.s2b("Found sink to estimate."));
+                Logger.flush(Mote.WARN);
+            }
+
             // Note the sink and start listening
             currentSinkReceiveIndex = sinkToEstimateIndex;
 
@@ -395,9 +436,27 @@ public class Source {
 
             startRx();
         } else {
+            if (ENABLE_DEBUG_PRINTING) {
+                Logger.appendString(csr.s2b("Finished estimation."));
+                Logger.flush(Mote.WARN);
+            }
+
             // Setting this mean no more estimation will take place.
             estimationDone = true;
         }
+    }
+
+    /**
+     * Update radio properties to match settings for a sink. Should not be used to
+     * change radio settings, use {@link #changeRadio(int)} instead as this method
+     * does no safety checks.
+     */
+    private static void setRadioProperties(int sinkIndex) {
+        radio.setPanId(SINK_BASE_PAN + sinkIndex, true);
+
+        radio.setShortAddr(SOURCE_ADDRESS);
+
+        radio.setChannel((byte) (SINK_BASE_CHANNEL + (byte) sinkIndex));
     }
 
     /**
@@ -407,13 +466,15 @@ public class Source {
         // We can only change settings if the write lock is unlocked, or says
         // we should be targeting the sink we were passed in
         if (writeInProgressLock == sinkIndex || writeInProgressLock == WRITE_UNLOCKED) {
+            if (ENABLE_DEBUG_PRINTING) {
+                Logger.appendString(csr.s2b("Changing Channel."));
+                Logger.flush(Mote.WARN);
+            }
+
             radio.stopRx();
 
-            radio.setPanId(SINK_BASE_PAN + sinkIndex, true);
-
-            radio.setShortAddr(SOURCE_ADDRESS);
-
-            radio.setChannel((byte) (SINK_BASE_CHANNEL + (byte) sinkIndex));
+            // Set radio properties to match sink
+            setRadioProperties(sinkIndex);
         }
     }
 
@@ -484,6 +545,11 @@ public class Source {
             startRx();
 
             return 0;
+        }
+
+        if (ENABLE_DEBUG_PRINTING) {
+            Logger.appendString(csr.s2b("Received Message!"));
+            Logger.flush(Mote.WARN);
         }
 
         // Ignore messages which are too short.
@@ -672,7 +738,7 @@ public class Source {
         radio.transmit(Device.ASAP | Radio.TXMODE_POWER_MAX, transmitBuffer, 0, transmitBuffer.length, 0);
 
         // Log transmission.
-        if (ENABLE_DEBUG_PRINTING) {
+        if (ENABLE_DEBUG_PRINTING || ENABLE_TX_PRINTING) {
             Logger.appendString(csr.s2b("((TX))"));
             Logger.flush(Mote.WARN);
         }

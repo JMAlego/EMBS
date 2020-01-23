@@ -94,9 +94,6 @@ public class SinkA {
 	        
 	        //set alarm to restart protocol
 	    	tstart.setAlarmBySpan(10*wait);
-	    	
-	        Logger.appendString(csr.s2b("----- A -"));
-        	Logger.flush(Mote.WARN);
                     
             return 0;
         }
@@ -135,8 +132,6 @@ public class SinkA {
 	        radio.startRx(Device.ASAP, 0, Time.currentTicks()+wait);
 	        // turn green LED on 
 	        LED.setState((byte)1, (byte)1);
-	        Logger.appendString(csr.s2b("----- A +"));
-        	Logger.flush(Mote.WARN);
         }
         
     }
