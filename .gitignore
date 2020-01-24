@@ -16,3 +16,6 @@ hs_err_pid*
 
 # VS Code
 .vscode/
+
+# Build output
+EMBS_Open_Assessment_1_Submission/
