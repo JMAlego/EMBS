@@ -1,6 +1,28 @@
 @startuml
-Bob -> Alice : hello
-activate Alice
-Alice -> Alice : some action
-return bye
+!pragma teoz true
+static -> estimatorTimer : Timeout set
+activate estimatorTimer
+deactivate estimatorTimer
+estimatorTimer -> "Receive Event" : Start receive
+activate "Receive Event"
+alt Receiving for Estimation
+    alt Final beacon in sync phase
+        "Receive Event" ->x receptionTimeoutTimer : Cancel timeout
+        "Receive Event" -> transmissionDelayTimer : Set timer for middle of Sink receive window
+    else Not final beacon in sync phase
+        "Receive Event" ->x receptionTimeoutTimer : Cancel timeout
+        "Receive Event" -> receptionTimeoutTimer : Set timeout for '2*t'
+    end
+else Receiving for Transmission sync
+    "Receive Event" -> transmissionDelayTimer : Set timer for middle of Sink receive window
+end
+"Receive Event" -> estimatorTimer
+deactivate "Receive Event"
+alt Reception times out
+  activate receptionTimeoutTimer
+  receptionTimeoutTimer -> timerSinkX : Schedule Sink
+  deactivate receptionTimeoutTimer
+end
+activate transmissionDelayTimer
+deactivate transmissionDelayTimer
 @enduml
