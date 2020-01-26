@@ -1,7 +1,19 @@
 <?xml version="1.0" standalone="no"?>
 <!DOCTYPE entity PUBLIC "-//UC Berkeley//DTD MoML 1//EN"
     "http://ptolemy.eecs.berkeley.edu/xml/dtd/MoML_1.dtd">
-<entity name="providedmodel" class="ptolemy.actor.TypedCompositeActor">
+<entity name="adaptedmodel" class="ptolemy.actor.TypedCompositeActor">
+    <property name="Base Transition Activity" class="ptolemy.vergil.kernel.attributes.RectangleAttribute">
+        <property name="_hideName" class="ptolemy.data.expr.SingletonParameter" value="false">
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1445.0, 380.0]">
+        </property>
+        <property name="width" class="ptolemy.data.expr.Parameter" value="440.0">
+        </property>
+        <property name="height" class="ptolemy.data.expr.Parameter" value="237.0">
+        </property>
+        <property name="_renderFirst" class="ptolemy.kernel.util.SingletonAttribute">
+        </property>
+    </property>
     <property name="Rectangle" class="ptolemy.vergil.kernel.attributes.RectangleAttribute">
         <property name="_location" class="ptolemy.kernel.util.Location" value="[445.0, 495.0]">
         </property>
@@ -22,13 +34,13 @@
         <property name="_location" class="ptolemy.kernel.util.Location" value="[80.0, 45.0]">
         </property>
     </property>
-    <property name="_windowProperties" class="ptolemy.actor.gui.WindowPropertiesAttribute" value="{bounds={-8, -8, 1936, 1176}, maximized=true}">
+    <property name="_windowProperties" class="ptolemy.actor.gui.WindowPropertiesAttribute" value="{bounds={-8, -8, 1936, 1056}, maximized=true}">
     </property>
-    <property name="_vergilSize" class="ptolemy.actor.gui.SizeAttribute" value="[1713, 1059]">
+    <property name="_vergilSize" class="ptolemy.actor.gui.SizeAttribute" value="[1713, 938]">
     </property>
-    <property name="_vergilZoomFactor" class="ptolemy.data.expr.ExpertParameter" value="1.0">
+    <property name="_vergilZoomFactor" class="ptolemy.data.expr.ExpertParameter" value="0.8">
     </property>
-    <property name="_vergilCenter" class="ptolemy.data.expr.ExpertParameter" value="{856.5, 529.5}">
+    <property name="_vergilCenter" class="ptolemy.data.expr.ExpertParameter" value="{1709.141414141414, 879.6292613636363}">
     </property>
     <property name="Annotation" class="ptolemy.vergil.kernel.attributes.TextAttribute">
         <property name="text" class="ptolemy.kernel.util.StringAttribute" value="Platform model, do not change&#10;anything inside the rectangle.">
@@ -40,6 +52,30 @@
         <property name="text" class="ptolemy.kernel.util.StringAttribute" value="CPU model, right-click and look inside.">
         </property>
         <property name="_location" class="ptolemy.kernel.util.Location" value="[790.0, 205.0]">
+        </property>
+    </property>
+    <property name="Bus-Invert Transition Activity (Not Counting Invert Lines)" class="ptolemy.vergil.kernel.attributes.RectangleAttribute">
+        <property name="_hideName" class="ptolemy.data.expr.SingletonParameter" value="false">
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1445.0, 760.0]">
+        </property>
+        <property name="width" class="ptolemy.data.expr.Parameter" value="460.0">
+        </property>
+        <property name="height" class="ptolemy.data.expr.Parameter" value="237.0">
+        </property>
+        <property name="_renderFirst" class="ptolemy.kernel.util.SingletonAttribute">
+        </property>
+    </property>
+    <property name="Bus-Invert Transition Activity (Counting Invert Lines)" class="ptolemy.vergil.kernel.attributes.RectangleAttribute">
+        <property name="_hideName" class="ptolemy.data.expr.SingletonParameter" value="false">
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1445.0, 1030.0]">
+        </property>
+        <property name="width" class="ptolemy.data.expr.Parameter" value="687.0">
+        </property>
+        <property name="height" class="ptolemy.data.expr.Parameter" value="409.0">
+        </property>
+        <property name="_renderFirst" class="ptolemy.kernel.util.SingletonAttribute">
         </property>
     </property>
     <entity name="Bus" class="lsi.instruction.SingleSharedMemoryBus">
@@ -158,7 +194,7 @@
         </port>
     </entity>
     <entity name="data bus state" class="ptolemy.actor.lib.gui.Display">
-        <property name="_windowProperties" class="ptolemy.actor.gui.WindowPropertiesAttribute" value="{bounds={1025, 30, 342, 246}, maximized=false}">
+        <property name="_windowProperties" class="ptolemy.actor.gui.WindowPropertiesAttribute" value="{bounds={1240, 112, 342, 527}, maximized=false}">
         </property>
         <property name="_location" class="ptolemy.kernel.util.Location" value="[1260.0, 545.0]">
         </property>
@@ -177,7 +213,7 @@
         </property>
     </entity>
     <entity name="address bus state" class="ptolemy.actor.lib.gui.Display">
-        <property name="_windowProperties" class="ptolemy.actor.gui.WindowPropertiesAttribute" value="{bounds={1025, 276, 342, 246}, maximized=false}">
+        <property name="_windowProperties" class="ptolemy.actor.gui.WindowPropertiesAttribute" value="{bounds={328, 202, 342, 605}, maximized=false}">
         </property>
         <property name="_location" class="ptolemy.kernel.util.Location" value="[1260.0, 600.0]">
         </property>
@@ -670,6 +706,318 @@
         <link port="InstructionProcessor3.debug" relation="relation13"/>
         <link port="InstructionProcessor3.clk" relation="relation9"/>
     </entity>
+    <entity name="TransitionActivityBase" class="TransitionActivityBase">
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1255.0, 695.0]">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.EditorIcon">
+            <property name="rectangle" class="ptolemy.vergil.kernel.attributes.RectangleAttribute">
+                <property name="_location" class="ptolemy.kernel.util.Location" value="0.0, 3.0">
+                </property>
+                <property name="width" class="ptolemy.data.expr.Parameter" value="60.0">
+                </property>
+                <property name="height" class="ptolemy.data.expr.Parameter" value="60.0">
+                </property>
+                <property name="centered" class="ptolemy.data.expr.Parameter" value="true">
+                </property>
+                <property name="fillColor" class="ptolemy.actor.gui.ColorAttribute" value="{1.0, 1.0, 1.0, 1.0}">
+                </property>
+                <property name="_renderFirst" class="ptolemy.kernel.util.SingletonAttribute">
+                </property>
+            </property>
+            <property name="Annotation" class="ptolemy.vergil.kernel.attributes.TextAttribute">
+                <property name="text" class="ptolemy.kernel.util.StringAttribute" value="Base">
+                </property>
+                <property name="_location" class="ptolemy.kernel.util.Location" value="[-18.0, 11.0]">
+                </property>
+            </property>
+            <property name="Annotation2" class="ptolemy.vergil.kernel.attributes.TextAttribute">
+                <property name="textSize" class="ptolemy.data.expr.Parameter" value="7">
+                </property>
+                <property name="text" class="ptolemy.kernel.util.StringAttribute" value="Transition&#10;Activity">
+                </property>
+                <property name="_location" class="ptolemy.kernel.util.Location" value="[-31.0, -27.0]">
+                </property>
+            </property>
+            <property name="_windowProperties" class="ptolemy.actor.gui.WindowPropertiesAttribute" value="{bounds={548, 281, 823, 518}, maximized=false}">
+            </property>
+            <property name="_vergilSize" class="ptolemy.actor.gui.SizeAttribute" value="[600, 400]">
+            </property>
+            <property name="_vergilZoomFactor" class="ptolemy.data.expr.ExpertParameter" value="4.0">
+            </property>
+            <property name="_vergilCenter" class="ptolemy.data.expr.ExpertParameter" value="{0.0, 0.0}">
+            </property>
+        </property>
+        <port name="clock" class="ptolemy.actor.TypedIOPort">
+            <property name="input"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Data Bus State" class="ptolemy.actor.TypedIOPort">
+            <property name="input"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Address Bus State" class="ptolemy.actor.TypedIOPort">
+            <property name="input"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Address Transition Count" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Data Transition Count" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Combined Transition Count" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+    </entity>
+    <entity name="Total Address Bus Transitions" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1750.0, 555.0]">
+        </property>
+    </entity>
+    <entity name="Total Data Bus Transitions" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1750.0, 500.0]">
+        </property>
+    </entity>
+    <entity name="Total Bus Transitions" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1750.0, 440.0]">
+        </property>
+    </entity>
+    <entity name="TransitionActivityBusInvert" class="TransitionActivityBusInvert">
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1255.0, 820.0]">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.EditorIcon">
+            <property name="rectangle" class="ptolemy.vergil.kernel.attributes.RectangleAttribute">
+                <property name="_location" class="ptolemy.kernel.util.Location" value="[0.0, 0.0]">
+                </property>
+                <property name="width" class="ptolemy.data.expr.Parameter" value="60">
+                </property>
+                <property name="height" class="ptolemy.data.expr.Parameter" value="120">
+                </property>
+                <property name="centered" class="ptolemy.data.expr.Parameter" value="true">
+                </property>
+                <property name="fillColor" class="ptolemy.actor.gui.ColorAttribute" value="{1.0, 1.0, 1.0, 1.0}">
+                </property>
+            </property>
+            <property name="Annotation" class="ptolemy.vergil.kernel.attributes.TextAttribute">
+                <property name="textSize" class="ptolemy.data.expr.Parameter" value="7">
+                </property>
+                <property name="text" class="ptolemy.kernel.util.StringAttribute" value="Transition&#10;Activity">
+                </property>
+                <property name="_location" class="ptolemy.kernel.util.Location" value="[-29.0, -58.0]">
+                </property>
+            </property>
+            <property name="Annotation2" class="ptolemy.vergil.kernel.attributes.TextAttribute">
+                <property name="textSize" class="ptolemy.data.expr.Parameter" value="12">
+                </property>
+                <property name="text" class="ptolemy.kernel.util.StringAttribute" value="Bus-Invert">
+                </property>
+                <property name="_location" class="ptolemy.kernel.util.Location" value="[-32.0, -14.0]">
+                </property>
+            </property>
+            <property name="_windowProperties" class="ptolemy.actor.gui.WindowPropertiesAttribute" value="{bounds={548, 281, 823, 518}, maximized=false}">
+            </property>
+            <property name="_vergilSize" class="ptolemy.actor.gui.SizeAttribute" value="[600, 400]">
+            </property>
+            <property name="_vergilZoomFactor" class="ptolemy.data.expr.ExpertParameter" value="4.0">
+            </property>
+            <property name="_vergilCenter" class="ptolemy.data.expr.ExpertParameter" value="{0.2027027027027, 25.5405405405405}">
+            </property>
+        </property>
+        <port name="clock" class="ptolemy.actor.TypedIOPort">
+            <property name="input"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Data Bus State" class="ptolemy.actor.TypedIOPort">
+            <property name="input"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Address Bus State" class="ptolemy.actor.TypedIOPort">
+            <property name="input"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Address Transition Count" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Data Transition Count" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Combined Transition Count" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Address Invert Transition Count" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Data Invert Transition Count" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Address Transition Count With Invert" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Data Transition Count With Invert" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+        <port name="Combined Transition Count With Invert" class="ptolemy.actor.TypedIOPort">
+            <property name="output"/>
+            <property name="_showName" class="ptolemy.data.expr.SingletonParameter" value="true">
+            </property>
+        </port>
+    </entity>
+    <entity name="Total Address Bus Transitions (Bus-Invert)" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1750.0, 965.0]">
+        </property>
+    </entity>
+    <entity name="Total Data Bus Transitions (Bus-Invert)" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1750.0, 910.0]">
+        </property>
+    </entity>
+    <entity name="Total Bus Transitions (Bus-Invert)" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1750.0, 850.0]">
+        </property>
+    </entity>
+    <entity name="Total Address Bus Invert Transitions (Bus-Invert)" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1795.0, 1390.0]">
+        </property>
+    </entity>
+    <entity name="Total Data Bus Invert Transitions (Bus-Invert)" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1795.0, 1330.0]">
+        </property>
+    </entity>
+    <entity name="Total Bus Transitions (Bus-Invert, Including Invert Lines) " class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1795.0, 1100.0]">
+        </property>
+    </entity>
+    <entity name="Total Address Bus Transitions (Bus-Invert, Including Invert Lines)" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1795.0, 1220.0]">
+        </property>
+    </entity>
+    <entity name="Total Data Bus Transitions (Bus-Invert, Including Invert Lines)" class="ptolemy.actor.lib.MonitorValue">
+        <doc>Monitor and display values</doc>
+        <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="20">
+        </property>
+        <property name="_icon" class="ptolemy.vergil.icon.UpdatedValueIcon">
+            <property name="attributeName" class="ptolemy.kernel.util.StringAttribute" value="value">
+            </property>
+            <property name="displayWidth" class="ptolemy.data.expr.Parameter" value="displayWidth">
+            </property>
+        </property>
+        <property name="_location" class="ptolemy.kernel.util.Location" value="[1795.0, 1160.0]">
+        </property>
+    </entity>
     <relation name="relation8" class="ptolemy.actor.TypedIORelation">
         <property name="width" class="ptolemy.data.expr.Parameter" value="1">
         </property>
@@ -772,6 +1120,62 @@
         <vertex name="vertex1" value="[995.0, 645.0]">
         </vertex>
     </relation>
+    <relation name="relation2" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+        <vertex name="vertex1" value="[550.0, 135.0]">
+        </vertex>
+    </relation>
+    <relation name="relation13" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+        <vertex name="vertex1" value="[1065.0, 135.0]">
+        </vertex>
+    </relation>
+    <relation name="relation23" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation24" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation25" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation16" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation17" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation20" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation26" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation27" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation28" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation29" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
+    <relation name="relation30" class="ptolemy.actor.TypedIORelation">
+        <property name="width" class="ptolemy.data.expr.Parameter" value="1">
+        </property>
+    </relation>
     <link port="Bus.clk" relation="relation7"/>
     <link port="Bus.toMemory" relation="relation19"/>
     <link port="Bus.fromMemory" relation="relation18"/>
@@ -801,7 +1205,37 @@
     <link port="Multiprocessor.out3" relation="relation6"/>
     <link port="Multiprocessor.out4" relation="relation11"/>
     <link port="Multiprocessor.clk" relation="relation22"/>
+    <link port="TransitionActivityBase.clock" relation="relation13"/>
+    <link port="TransitionActivityBase.Data Bus State" relation="relation9"/>
+    <link port="TransitionActivityBase.Address Bus State" relation="relation12"/>
+    <link port="TransitionActivityBase.Address Transition Count" relation="relation23"/>
+    <link port="TransitionActivityBase.Data Transition Count" relation="relation24"/>
+    <link port="TransitionActivityBase.Combined Transition Count" relation="relation25"/>
+    <link port="Total Address Bus Transitions.input" relation="relation23"/>
+    <link port="Total Data Bus Transitions.input" relation="relation24"/>
+    <link port="Total Bus Transitions.input" relation="relation25"/>
+    <link port="TransitionActivityBusInvert.clock" relation="relation13"/>
+    <link port="TransitionActivityBusInvert.Data Bus State" relation="relation9"/>
+    <link port="TransitionActivityBusInvert.Address Bus State" relation="relation12"/>
+    <link port="TransitionActivityBusInvert.Address Transition Count" relation="relation16"/>
+    <link port="TransitionActivityBusInvert.Data Transition Count" relation="relation17"/>
+    <link port="TransitionActivityBusInvert.Combined Transition Count" relation="relation20"/>
+    <link port="TransitionActivityBusInvert.Address Invert Transition Count" relation="relation26"/>
+    <link port="TransitionActivityBusInvert.Data Invert Transition Count" relation="relation27"/>
+    <link port="TransitionActivityBusInvert.Address Transition Count With Invert" relation="relation29"/>
+    <link port="TransitionActivityBusInvert.Data Transition Count With Invert" relation="relation30"/>
+    <link port="TransitionActivityBusInvert.Combined Transition Count With Invert" relation="relation28"/>
+    <link port="Total Address Bus Transitions (Bus-Invert).input" relation="relation16"/>
+    <link port="Total Data Bus Transitions (Bus-Invert).input" relation="relation17"/>
+    <link port="Total Bus Transitions (Bus-Invert).input" relation="relation20"/>
+    <link port="Total Address Bus Invert Transitions (Bus-Invert).input" relation="relation26"/>
+    <link port="Total Data Bus Invert Transitions (Bus-Invert).input" relation="relation27"/>
+    <link port="Total Bus Transitions (Bus-Invert, Including Invert Lines) .input" relation="relation28"/>
+    <link port="Total Address Bus Transitions (Bus-Invert, Including Invert Lines).input" relation="relation29"/>
+    <link port="Total Data Bus Transitions (Bus-Invert, Including Invert Lines).input" relation="relation30"/>
     <link relation1="relation8" relation2="relation18"/>
     <link relation1="relation10" relation2="relation19"/>
     <link relation1="relation7" relation2="relation22"/>
+    <link relation1="relation22" relation2="relation2"/>
+    <link relation1="relation2" relation2="relation13"/>
 </entity>
