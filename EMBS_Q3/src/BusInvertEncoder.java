@@ -1,15 +1,19 @@
-import ptolemy.actor.TypedAtomicActor;
 import ptolemy.actor.TypedIOPort;
 import ptolemy.data.StringToken;
-import ptolemy.data.Token;
 import ptolemy.data.type.BaseType;
 import ptolemy.kernel.CompositeEntity;
 import ptolemy.kernel.util.IllegalActionException;
 import ptolemy.kernel.util.NameDuplicationException;
 
+/**
+ * Bus-Invert encoder actor, based on the {@link BusEncoder} abstract base.
+ */
 @SuppressWarnings("serial")
-public class BusInvertEncoder extends TypedAtomicActor {
+public class BusInvertEncoder extends BusEncoder {
 
+    /**
+     * A container class for encode results.
+     */
     protected static class EncodeResult {
         public boolean busIsInverted;
         public String  busState;
@@ -20,63 +24,48 @@ public class BusInvertEncoder extends TypedAtomicActor {
         }
     }
 
-    private boolean dataBusIsInverted;
-    private boolean addressBusIsInverted;
+    // State information
+    private boolean busIsInvertedState;
 
-    private TypedIOPort dataBusState    = new TypedIOPort(this, "Data Bus State", true, false);
-    private TypedIOPort addressBusState = new TypedIOPort(this, "Address Bus State", true, false);
-
-    private TypedIOPort dataBusStateEncoded    = new TypedIOPort(this, "Encoded Data Bus State", false, true);
-    private TypedIOPort addressBusStateEncoded = new TypedIOPort(this, "Encoded Address Bus State", false, true);
-
-    private TypedIOPort dataBusInvert    = new TypedIOPort(this, "Data Bus Invert", false, true);
-    private TypedIOPort addressBusInvert = new TypedIOPort(this, "Address Bus Invert", false, true);
-
-    private String previousDataBusState;
-    private String previousAddressBusState;
-
-    private static final int    DEFAULT_CHANNEL   = 0;
-    private static final String DEFAULT_BUS_STATE = "0000000000000000";
-    private static final int    BUS_WIDTH         = 16;
-
-    private static final StringToken BUS_INVERTED     = new StringToken("1");
-    private static final StringToken BUS_NOT_INVERTED = new StringToken("0");
+    // New output port for inversion state
+    protected TypedIOPort outputPortBusInvert;
 
     public BusInvertEncoder(CompositeEntity container, String name)
             throws IllegalActionException, NameDuplicationException {
         super(container, name);
 
-        dataBusStateEncoded.setTypeEquals(BaseType.STRING);
-        addressBusStateEncoded.setTypeEquals(BaseType.STRING);
+        // Create new output port
+        outputPortBusInvert = new TypedIOPort(this, "Bus Invert", false, true);
 
-        dataBusInvert.setTypeEquals(BaseType.STRING);
-        addressBusInvert.setTypeEquals(BaseType.STRING);
+        // Set type for new output port
+        outputPortBusInvert.setTypeEquals(BaseType.STRING);
     }
 
-    @Override
-    public void initialize() throws IllegalActionException {
-        super.initialize();
-
-        dataBusIsInverted = false;
-        addressBusIsInverted = false;
-
-        previousDataBusState = DEFAULT_BUS_STATE;
-        previousAddressBusState = DEFAULT_BUS_STATE;
-    }
-
+    /**
+     * Invert's the bus state. This is done using textual replacement as it is the
+     * fastest way to implement this in Java, given our input is a string.
+     */
     protected String invertBusState(String busState) {
         // '?' Acts as an intermediary so that we don't end up with all zeros.
         return busState.replace('0', '?').replace('1', '0').replace('?', '1');
     }
 
+    /**
+     * Calculate the hamming distance from the before string to the after string.
+     * Both arguments should be of the same length otherwise an
+     * {@link IllegalArgumentException} will be thrown.
+     */
     protected int calculateHammingDistance(String before, String after) {
+        // Transition count
         int transitions = 0;
 
+        // Sanity check
         if (before.length() != after.length()) {
             throw new IllegalArgumentException("Both arguments must have the same length.");
         }
 
-        for (int bitIndex = 0; bitIndex < BUS_WIDTH; bitIndex++) {
+        // Loop through bits, comparing
+        for (int bitIndex = 0; bitIndex < before.length(); bitIndex++) {
             if (before.charAt(bitIndex) != after.charAt(bitIndex))
                 transitions++;
         }
@@ -84,13 +73,19 @@ public class BusInvertEncoder extends TypedAtomicActor {
         return transitions;
     }
 
-    protected EncodeResult encode(String newBusState, String previousBusState, boolean busIsInverted) {
+    /**
+     * Perform bus invert encoding on the input state, given the previous state and
+     * bus invert state.
+     */
+    protected EncodeResult busInvertEncode(String newBusState, String previousBusState, boolean busIsInverted) {
+        // Calculate hamming distances for invert and non-invert
         int nonInvertedHammingDistance = calculateHammingDistance(previousBusState, newBusState);
         int invertedHammingDistance = calculateHammingDistance(previousBusState, invertBusState(newBusState));
 
         boolean inversionStateNeedsChange = false;
         String resultBusState = newBusState;
 
+        // Compare hamming distances
         if (nonInvertedHammingDistance < invertedHammingDistance) { // if non-inverted is better
             inversionStateNeedsChange = busIsInverted;
         } else if (nonInvertedHammingDistance > invertedHammingDistance) { // if inverted is better
@@ -100,42 +95,48 @@ public class BusInvertEncoder extends TypedAtomicActor {
             resultBusState = invertBusState(newBusState);
         }
 
+        // Invert bus if needed
         if (inversionStateNeedsChange) {
-            // We invert the bus.
             busIsInverted = !busIsInverted;
         }
 
+        // Package return values in an EncodeResult
         return new EncodeResult(busIsInverted, resultBusState);
     }
 
-    private void processAddressTransition(String newInputState) {
-        EncodeResult result = encode(newInputState, previousAddressBusState, addressBusIsInverted);
-        addressBusIsInverted = result.busIsInverted;
-        previousAddressBusState = result.busState;
-    }
+    @Override
+    public void initialize() throws IllegalActionException {
+        super.initialize();
 
-    private void processDataTransition(String newInputState) {
-        EncodeResult result = encode(newInputState, previousDataBusState, dataBusIsInverted);
-        dataBusIsInverted = result.busIsInverted;
-        previousDataBusState = result.busState;
+        // Default bus state is not inverted
+        busIsInvertedState = false;
     }
 
     @Override
-    public void fire() throws IllegalActionException {
-        if (addressBusState.hasToken(DEFAULT_CHANNEL)) {
-            Token newAddressBusState = addressBusState.get(DEFAULT_CHANNEL);
-            String newAddressBusStateString = ((StringToken) newAddressBusState).stringValue();
-            processAddressTransition(newAddressBusStateString);
-            addressBusStateEncoded.send(DEFAULT_CHANNEL, new StringToken(previousAddressBusState));
-            addressBusInvert.send(DEFAULT_CHANNEL, addressBusIsInverted ? BUS_INVERTED : BUS_NOT_INVERTED);
-        }
+    protected void updateOutputPorts(String newEncodedBusState) throws IllegalActionException {
+        super.updateOutputPorts(newEncodedBusState);
 
-        if (dataBusState.hasToken(DEFAULT_CHANNEL)) {
-            Token newDataBusState = dataBusState.get(DEFAULT_CHANNEL);
-            String newDataBusStateString = ((StringToken) newDataBusState).stringValue();
-            processDataTransition(newDataBusStateString);
-            dataBusStateEncoded.send(DEFAULT_CHANNEL, new StringToken(previousDataBusState));
-            dataBusInvert.send(DEFAULT_CHANNEL, dataBusIsInverted ? BUS_INVERTED : BUS_NOT_INVERTED);
-        }
+        // Update the bus invert port, seperate to allow overriding
+        updateBusInvertPort();
     }
+
+    /**
+     * Update the bus invert port state. This is separate so it can be overridden.
+     */
+    protected void updateBusInvertPort() throws IllegalActionException {
+        outputPortBusInvert.send(DEFAULT_CHANNEL, new StringToken(busIsInvertedState ? "1" : "0"));
+    }
+
+    @Override
+    protected String encode(String newBusStateString) {
+        // Perform encoding
+        EncodeResult encodingResult = busInvertEncode(newBusStateString, previousBusState, busIsInvertedState);
+
+        // Update bus inversion state
+        busIsInvertedState = encodingResult.busIsInverted;
+
+        // return encoded bus state
+        return encodingResult.busState;
+    }
+
 }
